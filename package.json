@@ -1,10 +1,19 @@
 {
-  "name": "term-quiz",
+  "name": "@only-using-ai/quiz",
   "version": "1.0.0",
   "description": "Terminal-based Kahoot replacement",
   "type": "module",
   "bin": {
     "quiz": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "build": "tsc",
