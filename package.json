@@ -6,7 +6,9 @@
   "bin": {
     "quiz": "dist/cli.js"
   },
-  "url": "https://github.com/only-using-ai/quiz",
+  "repository": {
+    "url": "https://github.com/only-using-ai/quiz"
+  },
   "files": [
     "dist"
   ],
