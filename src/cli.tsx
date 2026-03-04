@@ -263,9 +263,14 @@ function ParticipantApp({ code, localPort }: { code: string; localPort?: number 
 
   const connect = (playerName: string): void => {
     setPhase({ name: 'connecting', playerName });
-    const serverUrl = localPort
-      ? `ws://localhost:${localPort}`
-      : `https://${code.toLowerCase()}.loca.lt`;
+    let serverUrl: string;
+    if (localPort) {
+      serverUrl = `ws://localhost:${localPort}`;
+    } else if (code.startsWith('http://') || code.startsWith('https://') || code.startsWith('ws://') || code.startsWith('wss://')) {
+      serverUrl = code;
+    } else {
+      serverUrl = `ws://localhost:3456`; // local fallback
+    }
     const c = new GameClient(serverUrl, playerName);
 
     c.on('message', (msg: ServerMessage) => {
@@ -373,7 +378,7 @@ function ParticipantApp({ code, localPort }: { code: string; localPort?: number 
 const { flags } = cli;
 
 if (flags.join) {
-  render(<ParticipantApp code={flags.join.toUpperCase()} localPort={flags.port} />);
+  render(<ParticipantApp code={flags.join} localPort={flags.port} />);
 } else if (flags.build || flags.host !== undefined) {
   render(<AdminApp buildFirst={flags.build} hostQuery={typeof flags.host === 'string' ? flags.host : undefined} />);
 } else {
