@@ -23,9 +23,10 @@ export default function LobbyScreen({ quiz, code, tunnelUrl, players, onStart }:
       <Box marginTop={1} />
 
       <Box borderStyle="round" borderColor="yellow" paddingX={2} paddingY={1} flexDirection="column" alignItems="center">
-        <Text>Session: <Text bold color="yellow">{code}</Text></Text>
+        <Text>Join code:</Text>
+        <Text bold color="yellow"> {code} </Text>
         <Box marginTop={1} />
-        <Text bold color="cyan">quiz --join {tunnelUrl.startsWith('LOCAL') ? `<code> --port <port>` : tunnelUrl}</Text>
+        <Text color="gray" dimColor>quiz --join {code}</Text>
       </Box>
 
       {tunnelUrl.startsWith('LOCAL') && (
