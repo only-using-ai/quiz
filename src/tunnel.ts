@@ -1,21 +1,21 @@
-// @ts-expect-error localtunnel has no types
-import localtunnel from 'localtunnel';
+import { tunnelmole } from 'tunnelmole';
 
 export interface Tunnel {
   url: string;
   close(): void;
 }
 
-export async function openTunnel(port: number, subdomain: string, timeoutMs = 8000): Promise<Tunnel> {
+export async function openTunnel(port: number, _subdomain: string, timeoutMs = 15000): Promise<Tunnel> {
   const timeout = new Promise<never>((_, reject) =>
     setTimeout(() => reject(new Error('tunnel timeout')), timeoutMs)
   );
-  const tunnel = await Promise.race([
-    localtunnel({ port, subdomain: subdomain.toLowerCase() }),
+  const url = await Promise.race([
+    tunnelmole({ port }),
     timeout,
-  ]);
+  ]) as string;
+
   return {
-    url: (tunnel as { url: string }).url,
-    close: () => (tunnel as { close(): void }).close(),
+    url,
+    close: () => { /* tunnelmole has no explicit close */ },
   };
 }
