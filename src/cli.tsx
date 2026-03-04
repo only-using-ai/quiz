@@ -46,7 +46,6 @@ const cli = meow(`
 type AdminPhase =
   | { name: 'build' }
   | { name: 'pick_quiz' }
-  | { name: 'starting'; quiz: Quiz }
   | { name: 'lobby'; quiz: Quiz; code: string; tunnelUrl: string; server: GameServer }
   | { name: 'question'; quiz: Quiz; server: GameServer; questionIndex: number; totalPlayers: number; remaining: number }
   | { name: 'results'; quiz: Quiz; server: GameServer; questionIndex: number; leaderboard: Score[]; totalPlayers: number }
@@ -59,8 +58,7 @@ function AdminApp({ buildFirst, hostQuery }: { buildFirst: boolean; hostQuery?: 
   const [players, setPlayers] = useState<Player[]>([]);
   const [statusMsg, setStatusMsg] = useState('');
 
-  const startHosting = async (quiz: Quiz): Promise<void> => {
-    setPhase({ name: 'starting', quiz });
+  const startHosting = (quiz: Quiz): void => {
     const code = generateCode();
     const port = 3456 + Math.floor(Math.random() * 1000);
     const server = new GameServer(quiz, port);
@@ -98,16 +96,14 @@ function AdminApp({ buildFirst, hostQuery }: { buildFirst: boolean; hostQuery?: 
       }
     });
 
-    let tunnelUrl = `localhost:${port}`;
-    let tunnelFailed = false;
-    try {
-      const tunnel = await openTunnel(port, code.toLowerCase());
-      tunnelUrl = tunnel.url;
-    } catch {
-      tunnelFailed = true;
-    }
+    // Show lobby immediately — tunnel connects in background
+    setPhase({ name: 'lobby', quiz, code, tunnelUrl: 'PENDING', server });
 
-    setPhase({ name: 'lobby', quiz, code, tunnelUrl: tunnelFailed ? `LOCAL ONLY — ws://localhost:${port}` : tunnelUrl, server });
+    openTunnel(port, code.toLowerCase(), 10000).then(tunnel => {
+      setPhase(prev => prev.name === 'lobby' ? { ...prev, tunnelUrl: tunnel.url } : prev);
+    }).catch(() => {
+      setPhase(prev => prev.name === 'lobby' ? { ...prev, tunnelUrl: `LOCAL ONLY — ws://localhost:${port}` } : prev);
+    });
   };
 
   const handleQuizBuilt = (quiz: Quiz): void => {
@@ -174,14 +170,6 @@ function AdminApp({ buildFirst, hostQuery }: { buildFirst: boolean; hostQuery?: 
           <Text key={q.id}>{i + 1}. {q.title} ({q.questions.length} questions)</Text>
         ))}
         <Text color="gray">Run: quiz --host "&lt;title&gt;"</Text>
-      </Box>
-    );
-  }
-
-  if (phase.name === 'starting') {
-    return (
-      <Box padding={1} flexDirection="column">
-        <Text color="yellow">Setting up tunnel... (timeout in 8s, will fall back to local)</Text>
       </Box>
     );
   }
@@ -261,7 +249,7 @@ function ParticipantApp({ code, localPort }: { code: string; localPort?: number 
   const [client, setClient] = useState<GameClient | null>(null);
   const [error, setError] = useState('');
 
-  const connect = (playerName: string): void => {
+  const connect = (playerName: string, attempt = 1): void => {
     setPhase({ name: 'connecting', playerName });
     const serverUrl = localPort
       ? `ws://localhost:${localPort}`
@@ -305,8 +293,13 @@ function ParticipantApp({ code, localPort }: { code: string; localPort?: number 
     });
 
     c.on('error', () => {
-      setError(`Could not connect to quiz "${code}". Is the host running?`);
-      setPhase({ name: 'enter_name' });
+      c.close();
+      if (attempt < 4) {
+        setTimeout(() => connect(playerName, attempt + 1), 1500);
+      } else {
+        setError(`Could not connect to quiz "${code}". Is the host running?`);
+        setPhase({ name: 'enter_name' });
+      }
     });
 
     setClient(c);

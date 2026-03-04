@@ -1,6 +1,6 @@
 {
   "name": "@only-using-ai/quiz",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Terminal-based Kahoot replacement",
   "type": "module",
   "bin": {

@@ -29,6 +29,9 @@ export default function LobbyScreen({ quiz, code, tunnelUrl, players, onStart }:
         <Text color="gray" dimColor>quiz --join {code}</Text>
       </Box>
 
+      {tunnelUrl === 'PENDING' && (
+        <Box marginTop={1}><Text color="gray" dimColor>Setting up tunnel...</Text></Box>
+      )}
       {tunnelUrl.startsWith('LOCAL') && (
         <Box marginTop={1}><Text color="yellow">{tunnelUrl}</Text></Box>
       )}
