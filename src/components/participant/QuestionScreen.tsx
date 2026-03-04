@@ -6,10 +6,10 @@ interface Props {
   question: Question;
   questionIndex: number;
   totalQuestions: number;
-  onAnswer: (answerId: string) => void;
+  onAnswer: (answerIds: string[]) => void;
   phase: 'answering' | 'waiting' | 'reveal';
-  selectedAnswerId?: string;
-  correctAnswerId?: string;
+  selectedAnswerIds?: string[];
+  correctAnswerIds?: string[];
   leaderboard?: Score[];
   playerName: string;
 }
@@ -24,12 +24,13 @@ export default function QuestionScreen({
   totalQuestions,
   onAnswer,
   phase,
-  selectedAnswerId,
-  correctAnswerId,
+  selectedAnswerIds,
+  correctAnswerIds,
   leaderboard,
   playerName,
 }: Props): React.ReactElement {
   const [elapsed, setElapsed] = useState(0);
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (phase !== 'answering') return;
@@ -38,13 +39,40 @@ export default function QuestionScreen({
     return () => clearInterval(t);
   }, [phase]);
 
-  useInput((input) => {
+  // Reset pending selections when a new question arrives
+  useEffect(() => {
+    setPendingIds(new Set());
+    setElapsed(0);
+  }, [question.id]);
+
+  const qType = question.type ?? 'multiple-choice';
+  const isMultiAnswer = qType === 'multiple-answer';
+
+  useInput((input, key) => {
     if (phase !== 'answering') return;
     const idx = KEYS.indexOf(input.toLowerCase() as typeof KEYS[number]);
-    if (idx >= 0 && idx < question.answers.length) {
-      onAnswer(question.answers[idx]!.id);
+
+    if (isMultiAnswer) {
+      if (idx >= 0 && idx < question.answers.length) {
+        const answerId = question.answers[idx]!.id;
+        setPendingIds(prev => {
+          const next = new Set(prev);
+          if (next.has(answerId)) next.delete(answerId);
+          else next.add(answerId);
+          return next;
+        });
+      } else if (key.return && pendingIds.size > 0) {
+        onAnswer([...pendingIds]);
+      }
+    } else {
+      if (idx >= 0 && idx < question.answers.length) {
+        onAnswer([question.answers[idx]!.id]);
+      }
     }
   });
+
+  const selectedSet = new Set(selectedAnswerIds ?? []);
+  const correctSet = new Set(correctAnswerIds ?? []);
 
   const myRank = leaderboard?.find(s => s.name === playerName)?.rank;
   const myScore = leaderboard?.find(s => s.name === playerName)?.score;
@@ -58,26 +86,43 @@ export default function QuestionScreen({
       <Box marginTop={1} />
 
       <Text bold>{question.text}</Text>
+      {isMultiAnswer && phase === 'answering' && (
+        <Text color="gray" dimColor>Select all that apply</Text>
+      )}
       <Box marginTop={1} />
 
       {question.answers.map((a, i) => {
         let color = COLORS[i]!;
-        let prefix = `[${LABELS[i]}]`;
         let suffix = '';
+        let prefix: string;
 
-        if (phase === 'reveal' && correctAnswerId) {
-          if (a.id === correctAnswerId) {
+        if (isMultiAnswer) {
+          // During answering: show toggle checkboxes
+          if (phase === 'answering') {
+            prefix = pendingIds.has(a.id) ? `[x]` : `[ ]`;
+          } else {
+            prefix = selectedSet.has(a.id) ? `[x]` : `[ ]`;
+          }
+        } else {
+          prefix = `[${LABELS[i]}]`;
+        }
+
+        if (phase === 'reveal' && correctAnswerIds) {
+          if (correctSet.has(a.id)) {
             color = 'green';
             suffix = ' ✓';
-          } else if (a.id === selectedAnswerId) {
+          } else if (selectedSet.has(a.id)) {
             color = 'red';
             suffix = ' ✗';
           }
-        } else if (phase !== 'answering' && a.id === selectedAnswerId) {
+        } else if (phase === 'waiting' && !isMultiAnswer && a.id === selectedAnswerIds?.[0]) {
           suffix = ' ◀ your answer';
         }
 
-        const isSelected = a.id === selectedAnswerId;
+        const isSelected = isMultiAnswer
+          ? (phase === 'answering' ? pendingIds.has(a.id) : selectedSet.has(a.id))
+          : a.id === selectedAnswerIds?.[0];
+
         return (
           <Box key={a.id} marginBottom={0}>
             <Text bold={isSelected} color={color}>
@@ -90,7 +135,15 @@ export default function QuestionScreen({
       <Box marginTop={1} />
 
       {phase === 'answering' && (
-        <Text color="gray">Press A / B / C / D to answer</Text>
+        isMultiAnswer ? (
+          <Text color="gray">
+            Press {LABELS.slice(0, question.answers.length).join(' / ')} to toggle,{' '}
+            <Text bold>Enter</Text> to submit
+            {pendingIds.size > 0 ? <Text color="cyan"> ({pendingIds.size} selected)</Text> : null}
+          </Text>
+        ) : (
+          <Text color="gray">Press {LABELS.slice(0, question.answers.length).join(' / ')} to answer</Text>
+        )
       )}
 
       {phase === 'waiting' && (

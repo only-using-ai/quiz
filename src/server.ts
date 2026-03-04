@@ -6,7 +6,7 @@ import { calculatePoints } from './utils/scoring.js';
 interface PlayerState extends Player {
   ws: WebSocket;
   answeredAt?: number;
-  answerId?: string;
+  answerIds?: string[];
 }
 
 export class GameServer extends EventEmitter {
@@ -81,17 +81,26 @@ export class GameServer extends EventEmitter {
 
     if (msg.type === 'answer') {
       const player = [...this.players.values()].find(p => p.ws === ws);
-      if (!player || player.answerId !== undefined) return; // already answered
+      if (!player || player.answerIds !== undefined) return; // already answered
 
       const elapsed = Date.now() - this.questionStartTime;
       const question = this.quiz.questions[this.currentQuestionIndex];
       if (!question || question.id !== msg.questionId) return;
 
-      const correct = question.answers.find(a => a.id === msg.answerId)?.isCorrect ?? false;
+      let correct: boolean;
+      if ((question.type ?? 'multiple-choice') === 'multiple-answer') {
+        // Correct only if selected IDs exactly match all correct answer IDs
+        const correctIds = new Set(question.answers.filter(a => a.isCorrect).map(a => a.id));
+        const selectedIds = new Set(msg.answerIds);
+        correct = correctIds.size === selectedIds.size && [...correctIds].every(id => selectedIds.has(id));
+      } else {
+        correct = question.answers.find(a => a.id === msg.answerIds[0])?.isCorrect ?? false;
+      }
+
       if (correct) {
         player.score += calculatePoints(elapsed);
       }
-      player.answerId = msg.answerId;
+      player.answerIds = msg.answerIds;
       player.answeredAt = elapsed;
 
       this.pendingAnswers--;
@@ -108,10 +117,10 @@ export class GameServer extends EventEmitter {
   private resolveQuestion(): void {
     const question = this.quiz.questions[this.currentQuestionIndex];
     if (!question) return;
-    const correctAnswer = question.answers.find(a => a.isCorrect);
+    const correctAnswerIds = question.answers.filter(a => a.isCorrect).map(a => a.id);
     const leaderboard = this.getLeaderboard();
 
-    this.broadcast({ type: 'all_answered', correctAnswerId: correctAnswer?.id ?? '', leaderboard });
+    this.broadcast({ type: 'all_answered', correctAnswerIds, leaderboard });
 
     const adminEvent: AdminEvent = { type: 'all_answered', leaderboard };
     this.emit('admin', adminEvent);
@@ -136,7 +145,7 @@ export class GameServer extends EventEmitter {
 
     // Reset answers
     for (const player of this.players.values()) {
-      player.answerId = undefined;
+      player.answerIds = undefined;
       player.answeredAt = undefined;
     }
     this.pendingAnswers = this.players.size;

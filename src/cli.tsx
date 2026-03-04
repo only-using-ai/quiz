@@ -252,7 +252,7 @@ type ParticipantPhase =
   | { name: 'enter_name' }
   | { name: 'connecting'; playerName: string }
   | { name: 'waiting'; playerName: string; players: string[] }
-  | { name: 'question'; playerName: string; question: Question; questionIndex: number; totalQuestions: number; answerPhase: 'answering' | 'waiting' | 'reveal'; selectedAnswerId?: string; correctAnswerId?: string; leaderboard?: Score[] }
+  | { name: 'question'; playerName: string; question: Question; questionIndex: number; totalQuestions: number; answerPhase: 'answering' | 'waiting' | 'reveal'; selectedAnswerIds?: string[]; correctAnswerIds?: string[]; leaderboard?: Score[] }
   | { name: 'ended'; playerName: string; leaderboard: Score[] };
 
 function ParticipantApp({ code, localPort }: { code: string; localPort?: number }): React.ReactElement {
@@ -290,7 +290,7 @@ function ParticipantApp({ code, localPort }: { code: string; localPort?: number 
       if (msg.type === 'all_answered') {
         setPhase(prev => {
           if (prev.name === 'question') {
-            return { ...prev, answerPhase: 'reveal', correctAnswerId: msg.correctAnswerId, leaderboard: msg.leaderboard };
+            return { ...prev, answerPhase: 'reveal', correctAnswerIds: msg.correctAnswerIds, leaderboard: msg.leaderboard };
           }
           return prev;
         });
@@ -312,11 +312,11 @@ function ParticipantApp({ code, localPort }: { code: string; localPort?: number 
     setClient(c);
   };
 
-  const handleAnswer = (answerId: string): void => {
+  const handleAnswer = (answerIds: string[]): void => {
     setPhase(prev => {
       if (prev.name !== 'question') return prev;
-      client?.answer(prev.question.id, answerId);
-      return { ...prev, answerPhase: 'waiting', selectedAnswerId: answerId };
+      client?.answer(prev.question.id, answerIds);
+      return { ...prev, answerPhase: 'waiting', selectedAnswerIds: answerIds };
     });
   };
 
@@ -353,8 +353,8 @@ function ParticipantApp({ code, localPort }: { code: string; localPort?: number 
         totalQuestions={phase.totalQuestions}
         onAnswer={handleAnswer}
         phase={phase.answerPhase}
-        selectedAnswerId={phase.selectedAnswerId}
-        correctAnswerId={phase.correctAnswerId}
+        selectedAnswerIds={phase.selectedAnswerIds}
+        correctAnswerIds={phase.correctAnswerIds}
         leaderboard={phase.leaderboard}
         playerName={phase.playerName}
       />

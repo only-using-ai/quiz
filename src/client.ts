@@ -45,8 +45,8 @@ export class GameClient extends EventEmitter {
     }
   }
 
-  answer(questionId: string, answerId: string): void {
-    this.send({ type: 'answer', questionId, answerId, timestamp: Date.now() });
+  answer(questionId: string, answerIds: string[]): void {
+    this.send({ type: 'answer', questionId, answerIds, timestamp: Date.now() });
   }
 
   close(): void {
